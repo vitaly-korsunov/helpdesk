@@ -1,16 +1,6 @@
 import cors from "cors";
 import express from "express";
-
-interface Ticket {
-  id: number;
-  subject: string;
-  status: "open" | "closed";
-}
-
-const tickets: Ticket[] = [
-  { id: 1, subject: "Cannot reset password", status: "open" },
-  { id: 2, subject: "Printer not connecting", status: "closed" },
-];
+import { prisma } from "./db";
 
 const app = express();
 app.use(cors());
@@ -20,17 +10,15 @@ app.get("/api/health", (_req, res) => {
   res.json({ status: "ok" });
 });
 
-app.get("/api/tickets", (_req, res) => {
+app.get("/api/tickets", async (_req, res) => {
+  const tickets = await prisma.ticket.findMany({ orderBy: { id: "asc" } });
   res.json(tickets);
 });
 
-app.post("/api/tickets", (req, res) => {
-  const ticket: Ticket = {
-    id: tickets.length + 1,
-    subject: req.body.subject,
-    status: "open",
-  };
-  tickets.push(ticket);
+app.post("/api/tickets", async (req, res) => {
+  const ticket = await prisma.ticket.create({
+    data: { subject: req.body.subject },
+  });
   res.status(201).json(ticket);
 });
 

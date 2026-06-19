@@ -10,6 +10,14 @@ interface Ticket {
 function App() {
   const [tickets, setTickets] = useState<Ticket[]>([])
   const [subject, setSubject] = useState('')
+  const [health, setHealth] = useState('checking...')
+
+  useEffect(() => {
+    fetch('/api/health')
+      .then((res) => res.json())
+      .then((data) => setHealth(data.status))
+      .catch(() => setHealth('unreachable'))
+  }, [])
 
   useEffect(() => {
     fetch('/api/tickets')
@@ -33,6 +41,7 @@ function App() {
   return (
     <main>
       <h1>HelpDesk</h1>
+      <p>API status: {health}</p>
 
       <form onSubmit={addTicket}>
         <input
