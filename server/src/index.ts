@@ -3,6 +3,12 @@ import express, { type NextFunction, type Request, type Response } from "express
 import { fromNodeHeaders, toNodeHandler } from "better-auth/node";
 import { auth } from "./auth";
 import { prisma } from "./db";
+import { Role } from "../generated/prisma/enums";
+
+const clientUrl = process.env.CLIENT_URL;
+if (!clientUrl) {
+  throw new Error("CLIENT_URL must be set in the environment");
+}
 
 async function requireAuth(req: Request, res: Response, next: NextFunction) {
   const session = await auth.api.getSession({ headers: fromNodeHeaders(req.headers) });
@@ -12,10 +18,23 @@ async function requireAuth(req: Request, res: Response, next: NextFunction) {
   next();
 }
 
+function requireRole(...roles: Role[]) {
+  return async (req: Request, res: Response, next: NextFunction) => {
+    const session = await auth.api.getSession({ headers: fromNodeHeaders(req.headers) });
+    if (!session) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    if (!roles.includes(session.user.role as Role)) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+    next();
+  };
+}
+
 const app = express();
 app.use(
   cors({
-    origin: process.env.CLIENT_URL ?? "http://localhost:5173",
+    origin: clientUrl,
     credentials: true,
   }),
 );

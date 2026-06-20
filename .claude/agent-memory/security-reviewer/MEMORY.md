@@ -1,0 +1,1 @@
+- [Helpdesk auth/authz architecture and findings](project_helpdesk_auth.md) — better-auth rate-limit gap, requireRole middleware, CORS fix status, enumeration analysis
