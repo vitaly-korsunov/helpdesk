@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react'
-import './App.css'
 import NavBar from './components/NavBar'
 import Login from './components/Login'
 import { useSession } from './lib/auth-client'
@@ -59,22 +58,33 @@ function App() {
   return (
     <>
       <NavBar userName={session.user.name} />
-      <main>
-        <h1>HelpDesk</h1>
-        <p>API status: {health}</p>
+      <main className="mx-auto max-w-md px-5 py-8 text-left">
+        <h1 className="my-8 text-5xl font-medium tracking-tight text-gray-950 max-md:my-5 max-md:text-4xl dark:text-gray-100">
+          HelpDesk
+        </h1>
+        <p className="text-gray-500 dark:text-gray-400">API status: {health}</p>
 
-        <form onSubmit={addTicket}>
+        <form onSubmit={addTicket} className="mb-6 mt-4 flex gap-2">
           <input
             value={subject}
             onChange={(e) => setSubject(e.target.value)}
             placeholder="New ticket subject"
+            className="flex-1 rounded-lg border border-gray-200 bg-white px-3 py-2 text-gray-950 dark:border-gray-800 dark:bg-zinc-900 dark:text-gray-100"
           />
-          <button type="submit">Add ticket</button>
+          <button
+            type="submit"
+            className="rounded-lg bg-purple-500 px-4 py-2 font-semibold text-white hover:opacity-90 dark:bg-purple-400"
+          >
+            Add ticket
+          </button>
         </form>
 
-        <ul>
+        <ul className="list-none p-0">
           {tickets.map((ticket) => (
-            <li key={ticket.id}>
+            <li
+              key={ticket.id}
+              className="border-b border-gray-200 py-2 dark:border-gray-800"
+            >
               <strong>#{ticket.id}</strong> {ticket.subject} —{' '}
               <em>{ticket.status}</em>
             </li>
