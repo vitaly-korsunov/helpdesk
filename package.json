@@ -6,6 +6,14 @@
   "scripts": {
     "dev:client": "bun --cwd client dev",
     "dev:server": "bun --cwd server dev",
-    "build": "bun --cwd client build"
+    "build": "bun --cwd client build",
+    "test:e2e": "playwright test",
+    "test:e2e:install": "playwright install chromium",
+    "test:server": "cd server && bun test",
+    "db:test:setup": "cd server && bun --env-file=.env.test run db:test:migrate",
+    "db:test:seed": "cd server && bun --env-file=.env.test run db:seed:e2e"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.58.2"
   }
 }

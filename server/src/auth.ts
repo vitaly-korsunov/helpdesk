@@ -14,9 +14,16 @@ export const auth = betterAuth({
   }),
   trustedOrigins: [clientUrl],
   rateLimit: {
-    enabled: true,
+    // Only throttle in production. Dev/test never set NODE_ENV=production,
+    // so local dev and the e2e suite run with rate limiting fully disabled.
+    enabled: process.env.NODE_ENV === "production",
     window: 10,
-    max: 5,
+    max: 20,
+    customRules: {
+      // "/get-session" is checked on every page load/focus and isn't a
+      // brute-force target, so it's exempt even when rate limiting is on.
+      "/get-session": false,
+    },
   },
   emailAndPassword: {
     enabled: true,
