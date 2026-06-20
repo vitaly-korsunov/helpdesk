@@ -1,23 +1,27 @@
-import { signOut } from '../lib/auth-client'
+import { Link } from 'react-router-dom'
+import { signOut } from '@/lib/auth-client'
+import { Button } from '@/components/ui/button'
 
 interface NavBarProps {
   userName?: string
+  isAdmin?: boolean
 }
 
-function NavBar({ userName }: NavBarProps) {
+function NavBar({ userName, isAdmin }: NavBarProps) {
   return (
-    <nav className="flex items-center justify-between border-b border-gray-200 px-5 py-4 dark:border-gray-800">
-      <span className="font-semibold text-gray-950 dark:text-gray-100">HelpDesk</span>
+    <nav className="flex items-center justify-between border-b border-border px-5 py-4">
+      <span className="font-heading font-semibold text-foreground">HelpDesk</span>
       {userName && (
         <div className="flex items-center gap-3">
-          <span>{userName}</span>
-          <button
-            type="button"
-            onClick={() => signOut()}
-            className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-zinc-800"
-          >
+          {isAdmin && (
+            <Link to="/user" className="text-sm text-muted-foreground hover:text-foreground">
+              Users
+            </Link>
+          )}
+          <span className="text-sm text-muted-foreground">{userName}</span>
+          <Button variant="outline" size="sm" onClick={() => signOut()}>
             Sign out
-          </button>
+          </Button>
         </div>
       )}
     </nav>
