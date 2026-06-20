@@ -3,11 +3,16 @@ import { prismaAdapter } from "better-auth/adapters/prisma";
 import { Role } from "../generated/prisma/enums";
 import { prisma } from "./db";
 
+const clientUrl = process.env.CLIENT_URL;
+if (!clientUrl) {
+  throw new Error("CLIENT_URL must be set in the environment");
+}
+
 export const auth = betterAuth({
   database: prismaAdapter(prisma, {
     provider: "postgresql",
   }),
-  trustedOrigins: [process.env.CLIENT_URL ?? "http://localhost:5173"],
+  trustedOrigins: [clientUrl],
   emailAndPassword: {
     enabled: true,
     disableSignUp: true,
