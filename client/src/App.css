@@ -92,6 +92,11 @@ main.login {
   color: var(--text-h);
 }
 
+.login-field-error {
+  font-size: 13px;
+  color: #e5484d;
+}
+
 .login-field input {
   padding: 11px 14px;
   border-radius: 10px;
@@ -109,6 +114,14 @@ main.login {
   outline: none;
   border-color: var(--accent-border);
   box-shadow: 0 0 0 3px var(--accent-bg);
+}
+
+.login-field input[aria-invalid='true'] {
+  border-color: #e5484d;
+}
+
+.login-field input[aria-invalid='true']:focus {
+  box-shadow: 0 0 0 3px rgba(229, 72, 77, 0.15);
 }
 
 .login-error {
