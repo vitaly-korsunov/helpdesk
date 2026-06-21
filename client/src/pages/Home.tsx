@@ -1,4 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { api } from '@/lib/api'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -18,35 +20,35 @@ interface Ticket {
 }
 
 function Home() {
-  const [tickets, setTickets] = useState<Ticket[]>([])
+  const queryClient = useQueryClient()
   const [subject, setSubject] = useState('')
-  const [health, setHealth] = useState('checking...')
 
-  useEffect(() => {
-    fetch('/api/health')
-      .then((res) => res.json())
-      .then((data) => setHealth(data.status))
-      .catch(() => setHealth('unreachable'))
-  }, [])
+  const { data: health, isPending: healthPending } = useQuery({
+    queryKey: ['health'],
+    queryFn: async () => (await api.get<{ status: string }>('/health')).data,
+    retry: false,
+  })
 
-  useEffect(() => {
-    fetch('/api/tickets')
-      .then((res) => res.json())
-      .then(setTickets)
-  }, [])
+  const { data: tickets = [] } = useQuery({
+    queryKey: ['tickets'],
+    queryFn: async () => (await api.get<Ticket[]>('/tickets')).data,
+  })
 
-  async function addTicket(e: React.FormEvent) {
+  const addTicketMutation = useMutation({
+    mutationFn: async (subject: string) => (await api.post<Ticket>('/tickets', { subject })).data,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tickets'] })
+      setSubject('')
+    },
+  })
+
+  function addTicket(e: React.FormEvent) {
     e.preventDefault()
     if (!subject.trim()) return
-    const res = await fetch('/api/tickets', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ subject }),
-    })
-    const ticket = await res.json()
-    setTickets((prev) => [...prev, ticket])
-    setSubject('')
+    addTicketMutation.mutate(subject)
   }
+
+  const healthLabel = healthPending ? 'checking...' : health?.status ?? 'unreachable'
 
   return (
     <main className="mx-auto w-full max-w-2xl px-5 py-8 text-left">
@@ -54,8 +56,8 @@ function Home() {
         <h1 className="font-heading text-3xl font-medium tracking-tight text-foreground">
           HelpDesk
         </h1>
-        <Badge variant={health === 'ok' ? 'outline' : 'destructive'}>
-          API: {health}
+        <Badge variant={healthLabel === 'ok' ? 'outline' : 'destructive'}>
+          API: {healthLabel}
         </Badge>
       </div>
 

@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { api } from '@/lib/api'
 import { Badge } from '@/components/ui/badge'
 import {
   Card,
@@ -26,20 +27,15 @@ interface User {
 }
 
 function UsersPage() {
-  const [users, setUsers] = useState<User[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(false)
-
-  useEffect(() => {
-    fetch('/api/users')
-      .then((res) => {
-        if (!res.ok) throw new Error('Failed to load users')
-        return res.json()
-      })
-      .then(setUsers)
-      .catch(() => setError(true))
-      .finally(() => setLoading(false))
-  }, [])
+  const {
+    data: users = [],
+    isPending,
+    isError,
+  } = useQuery({
+    queryKey: ['users'],
+    queryFn: async () => (await api.get<User[]>('/users')).data,
+    retry: false,
+  })
 
   return (
     <main className="mx-auto w-full max-w-5xl px-5 py-8 text-left">
@@ -53,9 +49,9 @@ function UsersPage() {
           <CardDescription>{users.length} total</CardDescription>
         </CardHeader>
         <CardContent>
-          {loading ? (
+          {isPending ? (
             <p className="py-2 text-sm text-muted-foreground">Loading…</p>
-          ) : error ? (
+          ) : isError ? (
             <p className="py-2 text-sm text-destructive">Failed to load users.</p>
           ) : users.length === 0 ? (
             <p className="py-2 text-sm text-muted-foreground">No users yet.</p>

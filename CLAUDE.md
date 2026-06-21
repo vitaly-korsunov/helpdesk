@@ -1,3 +1,12 @@
+# Client data fetching
+
+The client (`client/`) uses **TanStack Query** (`@tanstack/react-query`) and **axios** for all server communication. Don't add raw `useEffect` + `fetch` data fetching — it's the pattern this codebase moved away from.
+
+- **Queries/mutations**: use `useQuery`/`useMutation` from `@tanstack/react-query`. The `QueryClientProvider` is set up once in `client/src/main.tsx`. After a mutation that changes server state, invalidate the relevant query key (e.g. `queryClient.invalidateQueries({ queryKey: ['tickets'] })`) rather than manually patching local state.
+- **HTTP calls**: use the shared `api` instance from `client/src/lib/api.ts` (`axios.create({ baseURL: '/api' })`) inside query/mutation functions — call it as `api.get('/tickets')`, `api.post('/tickets', body)`, etc. Don't call `axios` directly or reintroduce `fetch`.
+- **`retry: false`**: set on queries where a failure should surface immediately (e.g. health checks, anything with an e2e test asserting an error state right after a mocked failed request) — TanStack Query's default retries (3, with backoff) will otherwise delay reaching the error state by several seconds.
+- Reference implementations: `client/src/pages/Home.tsx` (health/tickets queries, ticket-creation mutation) and `client/src/pages/UsersPage.tsx` (users query).
+
 # Testing
 
 This project has two separate test suites: server unit tests (Bun) and end-to-end tests (Playwright), run against different databases.
