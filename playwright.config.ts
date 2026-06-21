@@ -5,6 +5,7 @@ const SERVER_PORT = 3002
 
 export default defineConfig({
   testDir: './e2e',
+  outputDir: './e2e/test-results',
   // All specs share one server process (one DB, one in-memory rate-limit bucket) —
   // run sequentially to avoid cross-test interference.
   workers: 1,

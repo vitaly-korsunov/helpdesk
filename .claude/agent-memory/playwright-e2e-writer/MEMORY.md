@@ -1,0 +1,1 @@
+- [Helpdesk auth e2e coverage](project_helpdesk_auth_e2e.md) — login/logout/session spec layout + general UI flow coverage (ui.spec.ts: nav, health badge, ticket form), confirmed error text, what was skipped and why
