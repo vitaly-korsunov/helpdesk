@@ -1,15 +1,70 @@
 import { test, expect } from '@playwright/test'
-import { ADMIN } from './credentials'
+import { ADMIN, AGENT } from './credentials'
 import { login } from './helpers'
 
 test.describe('navigation', () => {
   test('an admin can click the Users link and land on the Users page', async ({ page }) => {
     await login(page, ADMIN.email, ADMIN.password)
 
+    const usersLoaded = page.waitForResponse(
+      (res) => res.url().includes('/api/users') && res.request().method() === 'GET',
+    )
     await page.getByRole('link', { name: 'Users' }).click()
+    await usersLoaded
 
     await expect(page).toHaveURL('/user')
     await expect(page.getByRole('heading', { name: 'Users' })).toBeVisible()
+  })
+})
+
+test.describe('users page', () => {
+  test('lists both seeded users with their email and role badge', async ({ page }) => {
+    const usersLoaded = page.waitForResponse(
+      (res) => res.url().includes('/api/users') && res.request().method() === 'GET',
+    )
+    await login(page, ADMIN.email, ADMIN.password)
+    await page.goto('/user')
+    await usersLoaded
+
+    await expect(page.getByText('Loading…')).not.toBeVisible()
+
+    // Table has exactly 4 columns, in this order, and nothing else.
+    const headers = page.getByRole('columnheader')
+    await expect(headers).toHaveText(['Name', 'Email', 'Role', 'Created'])
+
+    // Seeded users are named literally "Admin" and "Agent"; the backend
+    // sorts by name ascending, so "Admin" renders before "Agent".
+    // getByRole('row') also matches the header row, but filtering by the
+    // seeded emails (which only appear in data rows) excludes it naturally.
+    const adminRow = page.getByRole('row').filter({ hasText: ADMIN.email })
+    const agentRow = page.getByRole('row').filter({ hasText: AGENT.email })
+
+    await expect(adminRow).toBeVisible()
+    await expect(adminRow).toContainText('Admin')
+    await expect(adminRow.getByRole('cell', { name: 'ADMIN', exact: true })).toBeVisible()
+
+    await expect(agentRow).toBeVisible()
+    await expect(agentRow).toContainText('Agent')
+    await expect(agentRow.getByRole('cell', { name: 'AGENT', exact: true })).toBeVisible()
+
+    // Backend sorts by name ascending ("Admin" < "Agent"), so the admin row
+    // should precede the agent row regardless of how many other users exist.
+    const adminIndex = await adminRow.evaluate((el) =>
+      Array.from(el.parentElement?.children ?? []).indexOf(el),
+    )
+    const agentIndex = await agentRow.evaluate((el) =>
+      Array.from(el.parentElement?.children ?? []).indexOf(el),
+    )
+    expect(adminIndex).toBeLessThan(agentIndex)
+  })
+
+  test('shows an error state when the request fails', async ({ page }) => {
+    await page.route('**/api/users', (route) => route.fulfill({ status: 500, body: '{}' }))
+
+    await login(page, ADMIN.email, ADMIN.password)
+    await page.goto('/user')
+
+    await expect(page.getByText('Failed to load users.')).toBeVisible()
   })
 })
 

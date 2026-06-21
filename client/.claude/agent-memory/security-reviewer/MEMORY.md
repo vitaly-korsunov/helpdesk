@@ -1,0 +1,1 @@
+- [Helpdesk auth/authorization architecture](helpdesk_auth_architecture.md) — better-auth + Prisma roles, requireAuth vs requireRole, client gating pattern

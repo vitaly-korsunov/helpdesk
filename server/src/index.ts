@@ -3,7 +3,8 @@ import express from "express";
 import { toNodeHandler } from "better-auth/node";
 import { auth } from "./auth";
 import { prisma } from "./db";
-import { requireAuth } from "./middleware";
+import { requireAuth, requireRole } from "./middleware";
+import { Role } from "../generated/prisma/enums";
 
 const clientUrl = process.env.CLIENT_URL;
 if (!clientUrl) {
@@ -36,6 +37,21 @@ app.post("/api/tickets", requireAuth, async (req, res) => {
     data: { subject: req.body.subject },
   });
   res.status(201).json(ticket);
+});
+
+app.get("/api/users", requireRole(Role.ADMIN), async (_req, res) => {
+  const users = await prisma.user.findMany({
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      role: true,
+      emailVerified: true,
+      createdAt: true,
+    },
+    orderBy: { name: "asc" },
+  });
+  res.json(users);
 });
 
 app.use((_req, res) => {

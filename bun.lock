@@ -12,7 +12,9 @@
       "name": "client",
       "version": "0.0.0",
       "dependencies": {
+        "@fontsource-variable/big-shoulders": "^5.2.6",
         "@fontsource-variable/geist": "^5.2.9",
+        "@fontsource-variable/jetbrains-mono": "^5.2.8",
         "@hookform/resolvers": "^5.4.0",
         "@tailwindcss/vite": "^4.3.1",
         "better-auth": "^1.6.19",
@@ -207,7 +209,11 @@
 
     "@floating-ui/utils": ["@floating-ui/utils@0.2.11", "", {}, "sha512-RiB/yIh78pcIxl6lLMG0CgBXAZ2Y0eVHqMPYugu+9U0AeT6YBeiJpf7lbdJNIugFP5SIjwNRgo4DhR1Qxi26Gg=="],
 
+    "@fontsource-variable/big-shoulders": ["@fontsource-variable/big-shoulders@5.2.6", "", {}, "sha512-b3KplwhOEjQBqD6RdCef3+3Nisw4j9t2Av2I++VfYy0bcRd/aJSIiaX4o2cxspumNhfKy2u83QXta/iMt76emQ=="],
+
     "@fontsource-variable/geist": ["@fontsource-variable/geist@5.2.9", "", {}, "sha512-TP+QSBG3wxKGPE33CbMy/L0Nu3qvJ6Fy81Yc4LnQ95xH+i+cfEp8fyU8/kfV14YwszxIFPhnoMTbjL71waVpyQ=="],
+
+    "@fontsource-variable/jetbrains-mono": ["@fontsource-variable/jetbrains-mono@5.2.8", "", {}, "sha512-WBA9elru6Jdp5df2mES55wuOO0WIrn3kpXnI4+W2ek5u3ZgLS9XS4gmIlcQhiZOWEKl95meYdvK7xI+ETLCq/Q=="],
 
     "@hono/node-server": ["@hono/node-server@1.19.11", "", { "peerDependencies": { "hono": "^4" } }, "sha512-dr8/3zEaB+p0D2n/IUrlPF1HZm586qgJNXK1a9fhg/PzdtkK7Ksd5l312tJX2yBuALqDYBlG20QEbayqPyxn+g=="],
 

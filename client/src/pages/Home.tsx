@@ -49,7 +49,7 @@ function Home() {
   }
 
   return (
-    <main className="mx-auto max-w-2xl px-5 py-8 text-left">
+    <main className="mx-auto w-full max-w-2xl px-5 py-8 text-left">
       <div className="mb-6 flex items-center justify-between">
         <h1 className="font-heading text-3xl font-medium tracking-tight text-foreground">
           HelpDesk
@@ -59,9 +59,9 @@ function Home() {
         </Badge>
       </div>
 
-      <Card className="mb-6">
+      <Card className="mb-6 border-t-4 border-t-primary">
         <CardHeader>
-          <CardTitle>New ticket</CardTitle>
+          <CardTitle className="font-heading text-xl tracking-tight">New ticket</CardTitle>
           <CardDescription>Describe the issue you&apos;re seeing</CardDescription>
         </CardHeader>
         <CardContent>
@@ -84,7 +84,7 @@ function Home() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Tickets</CardTitle>
+          <CardTitle className="font-heading text-xl tracking-tight">Tickets</CardTitle>
           <CardDescription>{tickets.length} total</CardDescription>
         </CardHeader>
         <CardContent>
@@ -95,10 +95,13 @@ function Home() {
               {tickets.map((ticket) => (
                 <li
                   key={ticket.id}
-                  className="flex items-center justify-between gap-3 py-3 text-sm text-foreground"
+                  className="ticket-stub flex items-center justify-between gap-3 py-3 pr-1 text-sm text-foreground"
                 >
                   <span>
-                    <span className="font-medium">#{ticket.id}</span> {ticket.subject}
+                    <span className="rounded-sm bg-muted px-1.5 py-0.5 font-mono text-xs tracking-tight text-muted-foreground">
+                      #{ticket.id}
+                    </span>{' '}
+                    {ticket.subject}
                   </span>
                   <Badge variant={ticket.status === 'open' ? 'default' : 'secondary'}>
                     {ticket.status}

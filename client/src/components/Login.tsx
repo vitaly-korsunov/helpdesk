@@ -39,12 +39,14 @@ function Login() {
 
   return (
     <main className="flex flex-1 items-center justify-center px-5 py-10">
-      <Card className="w-full max-w-sm">
+      <Card className="w-full max-w-sm border-t-4 border-t-primary">
         <CardHeader className="items-center text-center">
-          <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-xl border border-primary/30 bg-primary/10 text-xl font-semibold text-primary">
-            H
+          <div className="mb-2 flex h-12 w-12 -rotate-3 items-center justify-center rounded-lg border-2 border-primary bg-primary/10 font-heading text-lg font-bold tracking-wide text-primary">
+            HD
           </div>
-          <CardTitle className="text-2xl">Welcome back</CardTitle>
+          <CardTitle className="font-heading text-3xl font-semibold tracking-tight">
+            Welcome back
+          </CardTitle>
           <CardDescription>Sign in to manage your tickets</CardDescription>
         </CardHeader>
         <CardContent>
