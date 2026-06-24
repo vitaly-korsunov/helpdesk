@@ -28,9 +28,12 @@ test.describe('users page', () => {
 
     await expect(page.getByText('Loading…')).not.toBeVisible()
 
-    // Table has exactly 4 columns, in this order, and nothing else.
+    // Table has exactly 5 columns, in this order, and nothing else. The
+    // trailing "Actions" column header has visually-hidden text
+    // (`<span className="sr-only">`) for the row-level edit button, but is
+    // still exposed to getByRole('columnheader') via its accessible name.
     const headers = page.getByRole('columnheader')
-    await expect(headers).toHaveText(['Name', 'Email', 'Role', 'Created'])
+    await expect(headers).toHaveText(['Name', 'Email', 'Role', 'Created', 'Actions'])
 
     // Seeded users are named literally "Admin" and "Agent"; the backend
     // sorts by name ascending, so "Admin" renders before "Agent".
@@ -91,9 +94,9 @@ test.describe('add user dialog', () => {
     const dialog = page.getByRole('dialog')
     await expect(dialog.getByText('Add user')).toBeVisible()
 
-    await page.getByLabel('Name').fill(name)
-    await page.getByLabel('Email').fill(email)
-    await page.getByLabel('Password').fill('password123')
+    await dialog.getByLabel('Name').fill(name)
+    await dialog.getByLabel('Email').fill(email)
+    await dialog.getByLabel('Password').fill('password123')
 
     const usersCreated = page.waitForResponse(
       (res) => res.url().includes('/api/users') && res.request().method() === 'POST',
@@ -128,9 +131,9 @@ test.describe('add user dialog', () => {
     await page.getByRole('button', { name: 'Add user' }).click()
     const dialog = page.getByRole('dialog')
 
-    await page.getByLabel('Name').fill('ab')
-    await page.getByLabel('Email').fill(`e2e-user-${Date.now()}@example.com`)
-    await page.getByLabel('Password').fill('password123')
+    await dialog.getByLabel('Name').fill('ab')
+    await dialog.getByLabel('Email').fill(`e2e-user-${Date.now()}@example.com`)
+    await dialog.getByLabel('Password').fill('password123')
     await page.getByRole('button', { name: 'Create user' }).click()
 
     await expect(page.getByText('Name must be at least 3 characters')).toBeVisible()
@@ -155,9 +158,9 @@ test.describe('add user dialog', () => {
     await page.getByRole('button', { name: 'Add user' }).click()
     const dialog = page.getByRole('dialog')
 
-    await page.getByLabel('Name').fill('E2E Test User')
-    await page.getByLabel('Email').fill('not-an-email')
-    await page.getByLabel('Password').fill('password123')
+    await dialog.getByLabel('Name').fill('E2E Test User')
+    await dialog.getByLabel('Email').fill('not-an-email')
+    await dialog.getByLabel('Password').fill('password123')
     await page.getByRole('button', { name: 'Create user' }).click()
 
     await expect(page.getByText('Enter a valid email')).toBeVisible()
@@ -182,9 +185,9 @@ test.describe('add user dialog', () => {
     await page.getByRole('button', { name: 'Add user' }).click()
     const dialog = page.getByRole('dialog')
 
-    await page.getByLabel('Name').fill('E2E Test User')
-    await page.getByLabel('Email').fill(`e2e-user-${Date.now()}@example.com`)
-    await page.getByLabel('Password').fill('short1')
+    await dialog.getByLabel('Name').fill('E2E Test User')
+    await dialog.getByLabel('Email').fill(`e2e-user-${Date.now()}@example.com`)
+    await dialog.getByLabel('Password').fill('short1')
     await page.getByRole('button', { name: 'Create user' }).click()
 
     await expect(page.getByText('Password must be at least 8 characters')).toBeVisible()
@@ -199,9 +202,9 @@ test.describe('add user dialog', () => {
     await page.getByRole('button', { name: 'Add user' }).click()
     const dialog = page.getByRole('dialog')
 
-    await page.getByLabel('Name').fill('Duplicate Email User')
-    await page.getByLabel('Email').fill(ADMIN.email)
-    await page.getByLabel('Password').fill('password123')
+    await dialog.getByLabel('Name').fill('Duplicate Email User')
+    await dialog.getByLabel('Email').fill(ADMIN.email)
+    await dialog.getByLabel('Password').fill('password123')
 
     const usersCreated = page.waitForResponse(
       (res) => res.url().includes('/api/users') && res.request().method() === 'POST',
@@ -211,6 +214,325 @@ test.describe('add user dialog', () => {
 
     await expect(page.getByText('A user with this email already exists')).toBeVisible()
     await expect(dialog).toBeVisible()
+  })
+})
+
+test.describe('edit user dialog', () => {
+  test('opens pre-filled with the row\'s current name and email, and an empty password', async ({
+    page,
+  }) => {
+    await login(page, ADMIN.email, ADMIN.password)
+    await page.goto('/user')
+
+    const agentRow = page.getByRole('row').filter({ hasText: AGENT.email })
+    await agentRow.getByRole('button', { name: 'Edit Agent', exact: true }).click()
+
+    const dialog = page.getByRole('dialog')
+    await expect(dialog.getByText('Edit user')).toBeVisible()
+    await expect(
+      dialog.getByText("Update the user's details. Leave the password blank to keep it unchanged."),
+    ).toBeVisible()
+
+    await expect(page.locator('#edit-name')).toHaveValue('Agent')
+    await expect(page.locator('#edit-email')).toHaveValue(AGENT.email)
+    await expect(page.locator('#edit-password')).toHaveValue('')
+  })
+
+  test('changing name and email with a blank password updates the row and leaves the password unchanged', async ({
+    page,
+    request,
+  }) => {
+    await login(page, ADMIN.email, ADMIN.password)
+    await page.goto('/user')
+
+    // Create a disposable user via page.request (shares the page's
+    // authenticated session cookie) rather than mutating the seeded
+    // ADMIN/AGENT fixtures, which other specs depend on staying stable.
+    const originalEmail = `e2e-edit-${Date.now()}@example.com`
+    const originalPassword = 'password123'
+    const created = await page.request.post('/api/users', {
+      data: { name: 'E2E Edit Target', email: originalEmail, password: originalPassword },
+    })
+    expect(created.ok()).toBe(true)
+
+    const usersLoaded = page.waitForResponse(
+      (res) => res.url().includes('/api/users') && res.request().method() === 'GET',
+    )
+    await page.reload()
+    await usersLoaded
+
+    const newEmail = `e2e-edit-updated-${Date.now()}@example.com`
+    // Deliberately avoid the substring "Name" here: it would become a
+    // permanent row in the (never-reset) test DB and collide with
+    // getByLabel('Name') matching this row's "Edit <name>" aria-label button
+    // by accessible-name substring in any future test that doesn't scope
+    // getByLabel to a specific dialog.
+    const newName = `E2E Edited User ${Date.now()}`
+
+    const row = page.getByRole('row').filter({ hasText: originalEmail })
+    await row.getByRole('button', { name: 'Edit E2E Edit Target', exact: true }).click()
+
+    const dialog = page.getByRole('dialog')
+    await page.locator('#edit-name').fill(newName)
+    await page.locator('#edit-email').fill(newEmail)
+    await expect(page.locator('#edit-password')).toHaveValue('')
+
+    const userUpdated = page.waitForResponse(
+      (res) => res.url().includes('/api/users') && res.request().method() === 'PATCH',
+    )
+    await page.getByRole('button', { name: 'Save changes' }).click()
+    await userUpdated
+
+    await expect(dialog).not.toBeVisible()
+
+    const updatedRow = page.getByRole('row').filter({ hasText: newEmail })
+    await expect(updatedRow).toBeVisible()
+    await expect(updatedRow).toContainText(newName)
+    await expect(page.getByRole('row').filter({ hasText: originalEmail })).not.toBeVisible()
+
+    // API-level proof (not UI login) that the original password still works
+    // -- confirms the blank password field left the credential untouched.
+    const signIn = await request.post('/api/auth/sign-in/email', {
+      data: { email: newEmail, password: originalPassword },
+    })
+    expect(signIn.ok()).toBe(true)
+  })
+
+  test('shows a validation error and does not submit when the name is too short', async ({
+    page,
+  }) => {
+    let userPatched = false
+    await page.route('**/api/users/**', (route) => {
+      if (route.request().method() === 'PATCH') {
+        userPatched = true
+      }
+      return route.continue()
+    })
+
+    await login(page, ADMIN.email, ADMIN.password)
+    await page.goto('/user')
+
+    const agentRow = page.getByRole('row').filter({ hasText: AGENT.email })
+    await agentRow.getByRole('button', { name: 'Edit Agent', exact: true }).click()
+
+    const dialog = page.getByRole('dialog')
+    await page.locator('#edit-name').fill('ab')
+    await page.getByRole('button', { name: 'Save changes' }).click()
+
+    await expect(page.getByText('Name must be at least 3 characters')).toBeVisible()
+    expect(userPatched).toBe(false)
+    await expect(dialog).toBeVisible()
+  })
+
+  test('shows a validation error and does not submit when the email is malformed', async ({
+    page,
+  }) => {
+    let userPatched = false
+    await page.route('**/api/users/**', (route) => {
+      if (route.request().method() === 'PATCH') {
+        userPatched = true
+      }
+      return route.continue()
+    })
+
+    await login(page, ADMIN.email, ADMIN.password)
+    await page.goto('/user')
+
+    const agentRow = page.getByRole('row').filter({ hasText: AGENT.email })
+    await agentRow.getByRole('button', { name: 'Edit Agent', exact: true }).click()
+
+    const dialog = page.getByRole('dialog')
+    await page.locator('#edit-email').fill('not-an-email')
+    await page.getByRole('button', { name: 'Save changes' }).click()
+
+    await expect(page.getByText('Enter a valid email')).toBeVisible()
+    expect(userPatched).toBe(false)
+    await expect(dialog).toBeVisible()
+  })
+
+  test('shows a validation error and does not submit when a non-empty password is too short', async ({
+    page,
+  }) => {
+    let userPatched = false
+    await page.route('**/api/users/**', (route) => {
+      if (route.request().method() === 'PATCH') {
+        userPatched = true
+      }
+      return route.continue()
+    })
+
+    await login(page, ADMIN.email, ADMIN.password)
+    await page.goto('/user')
+
+    const agentRow = page.getByRole('row').filter({ hasText: AGENT.email })
+    await agentRow.getByRole('button', { name: 'Edit Agent', exact: true }).click()
+
+    const dialog = page.getByRole('dialog')
+    await page.locator('#edit-password').fill('short1')
+    await page.getByRole('button', { name: 'Save changes' }).click()
+
+    await expect(page.getByText('Password must be at least 8 characters')).toBeVisible()
+    expect(userPatched).toBe(false)
+    await expect(dialog).toBeVisible()
+  })
+
+  test('shows a server-side conflict error when editing the email to match a different user', async ({
+    page,
+  }) => {
+    // Disposable target user, created via the API so the seeded fixtures
+    // are never mutated.
+    const targetEmail = `e2e-edit-conflict-${Date.now()}@example.com`
+
+    const usersLoaded = page.waitForResponse(
+      (res) => res.url().includes('/api/users') && res.request().method() === 'GET',
+    )
+    await login(page, ADMIN.email, ADMIN.password)
+    await page.goto('/user')
+    await usersLoaded
+
+    const usersCreated = page.waitForResponse(
+      (res) => res.url().includes('/api/users') && res.request().method() === 'POST',
+    )
+    await page.getByRole('button', { name: 'Add user' }).click()
+    const addDialog = page.getByRole('dialog')
+    await addDialog.getByLabel('Name').fill('Conflict Target')
+    await addDialog.getByLabel('Email').fill(targetEmail)
+    await addDialog.getByLabel('Password').fill('password123')
+    await page.getByRole('button', { name: 'Create user' }).click()
+    await usersCreated
+    await expect(page.getByRole('dialog')).not.toBeVisible()
+
+    // Edit the target user's email to collide with the already-existing
+    // AGENT fixture's email.
+    const row = page.getByRole('row').filter({ hasText: targetEmail })
+    await row.getByRole('button', { name: 'Edit Conflict Target', exact: true }).click()
+
+    const dialog = page.getByRole('dialog')
+    await page.locator('#edit-email').fill(AGENT.email)
+
+    const userPatchAttempt = page.waitForResponse(
+      (res) => res.url().includes('/api/users') && res.request().method() === 'PATCH',
+    )
+    await page.getByRole('button', { name: 'Save changes' }).click()
+    await userPatchAttempt
+
+    await expect(page.getByText('A user with this email already exists')).toBeVisible()
+    await expect(dialog).toBeVisible()
+  })
+})
+
+test.describe('delete user dialog', () => {
+  test('cancelling the confirmation leaves the row untouched and fires no request', async ({
+    page,
+  }) => {
+    // Disposable target user, created via the API so the seeded fixtures
+    // are never mutated.
+    const targetEmail = `e2e-delete-cancel-${Date.now()}@example.com`
+    const targetName = `E2E Delete Cancel Target ${Date.now()}`
+
+    const usersLoaded = page.waitForResponse(
+      (res) => res.url().includes('/api/users') && res.request().method() === 'GET',
+    )
+    await login(page, ADMIN.email, ADMIN.password)
+    await page.goto('/user')
+    await usersLoaded
+
+    const created = await page.request.post('/api/users', {
+      data: { name: targetName, email: targetEmail, password: 'password123' },
+    })
+    expect(created.ok()).toBe(true)
+
+    await page.reload()
+    await page.waitForResponse(
+      (res) => res.url().includes('/api/users') && res.request().method() === 'GET',
+    )
+
+    let deleteRequested = false
+    await page.route('**/api/users/**', (route) => {
+      if (route.request().method() === 'DELETE') {
+        deleteRequested = true
+      }
+      return route.continue()
+    })
+
+    const row = page.getByRole('row').filter({ hasText: targetEmail })
+    await row.getByRole('button', { name: `Delete ${targetName}`, exact: true }).click()
+
+    const alertDialog = page.getByRole('alertdialog')
+    await expect(alertDialog.getByText('Delete user')).toBeVisible()
+    await expect(
+      alertDialog.getByText(`Are you sure you want to delete ${targetName}? They will lose access immediately.`),
+    ).toBeVisible()
+
+    await alertDialog.getByRole('button', { name: 'Cancel', exact: true }).click()
+
+    await expect(alertDialog).not.toBeVisible()
+    expect(deleteRequested).toBe(false)
+    await expect(row).toBeVisible()
+  })
+
+  test('confirming deletion removes the row, decrements the total count, and the user can no longer sign in', async ({
+    page,
+    request,
+  }) => {
+    const targetEmail = `e2e-delete-confirm-${Date.now()}@example.com`
+    const targetName = `E2E Delete Confirm Target ${Date.now()}`
+    const targetPassword = 'password123'
+
+    const usersLoaded = page.waitForResponse(
+      (res) => res.url().includes('/api/users') && res.request().method() === 'GET',
+    )
+    await login(page, ADMIN.email, ADMIN.password)
+    await page.goto('/user')
+    await usersLoaded
+
+    const created = await page.request.post('/api/users', {
+      data: { name: targetName, email: targetEmail, password: targetPassword },
+    })
+    expect(created.ok()).toBe(true)
+
+    const usersReloaded = page.waitForResponse(
+      (res) => res.url().includes('/api/users') && res.request().method() === 'GET',
+    )
+    await page.reload()
+    await usersReloaded
+
+    const countLocator = page.getByText(/total$/)
+    const before = await countLocator.textContent()
+    const beforeCount = Number(before?.match(/^(\d+) total$/)?.[1])
+    expect(Number.isNaN(beforeCount)).toBe(false)
+
+    const row = page.getByRole('row').filter({ hasText: targetEmail })
+    await row.getByRole('button', { name: `Delete ${targetName}`, exact: true }).click()
+
+    const alertDialog = page.getByRole('alertdialog')
+    await expect(alertDialog).toBeVisible()
+
+    const userDeleted = page.waitForResponse(
+      (res) => res.url().includes('/api/users') && res.request().method() === 'DELETE',
+    )
+    await alertDialog.getByRole('button', { name: 'Delete', exact: true }).click()
+    await userDeleted
+
+    await expect(alertDialog).not.toBeVisible()
+    await expect(row).not.toBeVisible()
+    await expect(countLocator).toHaveText(`${beforeCount - 1} total`)
+
+    // A soft-deleted user can no longer sign in.
+    const signIn = await request.post('/api/auth/sign-in/email', {
+      data: { email: targetEmail, password: targetPassword },
+    })
+    expect(signIn.ok()).toBe(false)
+    expect(signIn.status()).toBeGreaterThanOrEqual(400)
+    expect(signIn.status()).toBeLessThan(500)
+  })
+
+  test("the seeded Admin row's delete button is disabled", async ({ page }) => {
+    await login(page, ADMIN.email, ADMIN.password)
+    await page.goto('/user')
+
+    const adminRow = page.getByRole('row').filter({ hasText: ADMIN.email })
+    await expect(adminRow.getByRole('button', { name: 'Delete Admin', exact: true })).toBeDisabled()
   })
 })
 

@@ -1,4 +1,5 @@
 import { betterAuth } from "better-auth";
+import { APIError, createAuthMiddleware } from "better-auth/api";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { Role } from "../generated/prisma/enums";
 import { prisma } from "./db";
@@ -35,6 +36,17 @@ export const auth = betterAuth({
     sendVerificationEmail: async ({ user, url }) => {
       console.log(`[auth] verification link for ${user.email}: ${url}`);
     },
+  },
+  hooks: {
+    before: createAuthMiddleware(async (ctx) => {
+      if (ctx.path !== "/sign-in/email") return;
+
+      const email = ctx.body?.email;
+      const user = typeof email === "string" ? await prisma.user.findUnique({ where: { email } }) : null;
+      if (user?.deletedAt) {
+        throw new APIError("BAD_REQUEST", { message: "Invalid email or password" });
+      }
+    }),
   },
   user: {
     additionalFields: {

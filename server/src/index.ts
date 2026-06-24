@@ -1,6 +1,6 @@
 import cors from "cors";
 import express from "express";
-import { createUserSchema } from "core";
+import { createUserSchema, updateUserSchema } from "core";
 import { toNodeHandler } from "better-auth/node";
 import { hashPassword } from "better-auth/crypto";
 import { auth } from "./auth";
@@ -52,6 +52,7 @@ app.post("/api/tickets", requireAuth, async (req, res) => {
 
 app.get("/api/users", requireRole(Role.ADMIN), async (_req, res) => {
   const users = await prisma.user.findMany({
+    where: { deletedAt: null },
     select: userSelect,
     orderBy: { name: "asc" },
   });
@@ -91,6 +92,65 @@ app.post("/api/users", requireRole(Role.ADMIN), async (req, res) => {
   });
 
   res.status(201).json(user);
+});
+
+app.patch("/api/users/:id", requireRole(Role.ADMIN), async (req, res) => {
+  const parsed = updateUserSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ message: parsed.error.issues[0].message });
+  }
+  const { name, email, password } = parsed.data;
+  const userId = req.params.id as string;
+
+  const existing = await prisma.user.findUnique({ where: { id: userId } });
+  if (!existing || existing.deletedAt) {
+    return res.status(404).json({ message: "User not found" });
+  }
+
+  const emailTaken = await prisma.user.findUnique({ where: { email } });
+  if (emailTaken && emailTaken.id !== userId) {
+    return res.status(409).json({ message: "A user with this email already exists" });
+  }
+
+  const hashedPassword = password === "" ? null : await hashPassword(password);
+
+  const user = await prisma.$transaction(async (tx) => {
+    const updated = await tx.user.update({
+      where: { id: userId },
+      data: { name, email },
+      select: userSelect,
+    });
+
+    if (hashedPassword) {
+      await tx.account.updateMany({
+        where: { userId, providerId: "credential" },
+        data: { password: hashedPassword },
+      });
+    }
+
+    return updated;
+  });
+
+  res.json(user);
+});
+
+app.delete("/api/users/:id", requireRole(Role.ADMIN), async (req, res) => {
+  const userId = req.params.id as string;
+
+  const existing = await prisma.user.findUnique({ where: { id: userId } });
+  if (!existing || existing.deletedAt) {
+    return res.status(404).json({ message: "User not found" });
+  }
+  if (existing.role === Role.ADMIN) {
+    return res.status(403).json({ message: "Admin users cannot be deleted" });
+  }
+
+  await prisma.$transaction([
+    prisma.user.update({ where: { id: userId }, data: { deletedAt: new Date() } }),
+    prisma.session.deleteMany({ where: { userId } }),
+  ]);
+
+  res.status(204).send();
 });
 
 app.use((_req, res) => {
