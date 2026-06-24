@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import { Badge } from '@/components/ui/badge'
+import { Skeleton } from '@/components/ui/skeleton'
 import {
   Card,
   CardContent,
@@ -50,7 +51,16 @@ function UsersPage() {
         </CardHeader>
         <CardContent>
           {isPending ? (
-            <p className="py-2 text-sm text-muted-foreground">Loading…</p>
+            <div className="space-y-4 py-2">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="flex items-center gap-6">
+                  <Skeleton className="h-4 w-20" />
+                  <Skeleton className="h-4 w-40" />
+                  <Skeleton className="h-5 w-16 rounded-full" />
+                  <Skeleton className="h-4 w-20" />
+                </div>
+              ))}
+            </div>
           ) : isError ? (
             <p className="py-2 text-sm text-destructive">Failed to load users.</p>
           ) : users.length === 0 ? (

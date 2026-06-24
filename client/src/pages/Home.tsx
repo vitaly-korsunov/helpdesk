@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/card'
 import { Field, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
+import { Skeleton } from '@/components/ui/skeleton'
 
 interface Ticket {
   id: number
@@ -29,7 +30,7 @@ function Home() {
     retry: false,
   })
 
-  const { data: tickets = [] } = useQuery({
+  const { data: tickets = [], isPending: ticketsPending } = useQuery({
     queryKey: ['tickets'],
     queryFn: async () => (await api.get<Ticket[]>('/tickets')).data,
   })
@@ -48,17 +49,19 @@ function Home() {
     addTicketMutation.mutate(subject)
   }
 
-  const healthLabel = healthPending ? 'checking...' : health?.status ?? 'unreachable'
-
   return (
     <main className="mx-auto w-full max-w-2xl px-5 py-8 text-left">
       <div className="mb-6 flex items-center justify-between">
         <h1 className="font-heading text-3xl font-medium tracking-tight text-foreground">
           HelpDesk
         </h1>
-        <Badge variant={healthLabel === 'ok' ? 'outline' : 'destructive'}>
-          API: {healthLabel}
-        </Badge>
+        {healthPending ? (
+          <Skeleton className="h-5 w-24 rounded-full" />
+        ) : (
+          <Badge variant={health?.status === 'ok' ? 'outline' : 'destructive'}>
+            API: {health?.status ?? 'unreachable'}
+          </Badge>
+        )}
       </div>
 
       <Card className="mb-6 border-t-4 border-t-primary">
@@ -90,7 +93,19 @@ function Home() {
           <CardDescription>{tickets.length} total</CardDescription>
         </CardHeader>
         <CardContent>
-          {tickets.length === 0 ? (
+          {ticketsPending ? (
+            <ul className="divide-y divide-border">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <li key={i} className="flex items-center justify-between gap-3 py-3 pr-1">
+                  <span className="flex items-center gap-2">
+                    <Skeleton className="h-5 w-8 rounded-sm" />
+                    <Skeleton className="h-4 w-40" />
+                  </span>
+                  <Skeleton className="h-5 w-14 rounded-full" />
+                </li>
+              ))}
+            </ul>
+          ) : tickets.length === 0 ? (
             <p className="py-2 text-sm text-muted-foreground">No tickets yet.</p>
           ) : (
             <ul className="divide-y divide-border">

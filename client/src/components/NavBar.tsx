@@ -10,10 +10,13 @@ interface NavBarProps {
 function NavBar({ userName, isAdmin }: NavBarProps) {
   return (
     <nav className="flex items-center justify-between border-b-2 border-primary/30 bg-card px-5 py-4">
-      <span className="flex items-center gap-2 font-heading text-xl font-semibold tracking-wide text-foreground uppercase">
+      <Link
+        to="/"
+        className="flex items-center gap-2 font-heading text-xl font-semibold tracking-wide text-foreground uppercase"
+      >
         <span className="inline-block h-2 w-2 rounded-full bg-primary" aria-hidden="true" />
         HelpDesk
-      </span>
+      </Link>
       {userName && (
         <div className="flex items-center gap-4">
           {isAdmin && (
