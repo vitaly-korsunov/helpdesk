@@ -19,6 +19,7 @@
     "@prisma/adapter-pg": "latest",
     "@prisma/client": "latest",
     "better-auth": "^1.6.19",
+    "core": "workspace:*",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^5.1.0",

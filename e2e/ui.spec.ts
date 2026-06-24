@@ -68,6 +68,152 @@ test.describe('users page', () => {
   })
 })
 
+test.describe('add user dialog', () => {
+  test('creating a user with valid details adds a row and increments the total count', async ({
+    page,
+  }) => {
+    const usersLoaded = page.waitForResponse(
+      (res) => res.url().includes('/api/users') && res.request().method() === 'GET',
+    )
+    await login(page, ADMIN.email, ADMIN.password)
+    await page.goto('/user')
+    await usersLoaded
+
+    const countLocator = page.getByText(/total$/)
+    const before = await countLocator.textContent()
+    const beforeCount = Number(before?.match(/^(\d+) total$/)?.[1])
+    expect(Number.isNaN(beforeCount)).toBe(false)
+
+    const email = `e2e-user-${Date.now()}@example.com`
+    const name = `E2E User ${Date.now()}`
+
+    await page.getByRole('button', { name: 'Add user' }).click()
+    const dialog = page.getByRole('dialog')
+    await expect(dialog.getByText('Add user')).toBeVisible()
+
+    await page.getByLabel('Name').fill(name)
+    await page.getByLabel('Email').fill(email)
+    await page.getByLabel('Password').fill('password123')
+
+    const usersCreated = page.waitForResponse(
+      (res) => res.url().includes('/api/users') && res.request().method() === 'POST',
+    )
+    await page.getByRole('button', { name: 'Create user' }).click()
+    await usersCreated
+
+    await expect(dialog).not.toBeVisible()
+
+    const newRow = page.getByRole('row').filter({ hasText: email })
+    await expect(newRow).toBeVisible()
+    await expect(newRow).toContainText(name)
+    await expect(newRow.getByRole('cell', { name: 'AGENT', exact: true })).toBeVisible()
+
+    await expect(countLocator).toHaveText(`${beforeCount + 1} total`)
+  })
+
+  test('shows a validation error and does not submit when the name is too short', async ({
+    page,
+  }) => {
+    let userRequested = false
+    await page.route('**/api/users', (route) => {
+      if (route.request().method() === 'POST') {
+        userRequested = true
+      }
+      return route.continue()
+    })
+
+    await login(page, ADMIN.email, ADMIN.password)
+    await page.goto('/user')
+
+    await page.getByRole('button', { name: 'Add user' }).click()
+    const dialog = page.getByRole('dialog')
+
+    await page.getByLabel('Name').fill('ab')
+    await page.getByLabel('Email').fill(`e2e-user-${Date.now()}@example.com`)
+    await page.getByLabel('Password').fill('password123')
+    await page.getByRole('button', { name: 'Create user' }).click()
+
+    await expect(page.getByText('Name must be at least 3 characters')).toBeVisible()
+    expect(userRequested).toBe(false)
+    await expect(dialog).toBeVisible()
+  })
+
+  test('shows a validation error and does not submit when the email is malformed', async ({
+    page,
+  }) => {
+    let userRequested = false
+    await page.route('**/api/users', (route) => {
+      if (route.request().method() === 'POST') {
+        userRequested = true
+      }
+      return route.continue()
+    })
+
+    await login(page, ADMIN.email, ADMIN.password)
+    await page.goto('/user')
+
+    await page.getByRole('button', { name: 'Add user' }).click()
+    const dialog = page.getByRole('dialog')
+
+    await page.getByLabel('Name').fill('E2E Test User')
+    await page.getByLabel('Email').fill('not-an-email')
+    await page.getByLabel('Password').fill('password123')
+    await page.getByRole('button', { name: 'Create user' }).click()
+
+    await expect(page.getByText('Enter a valid email')).toBeVisible()
+    expect(userRequested).toBe(false)
+    await expect(dialog).toBeVisible()
+  })
+
+  test('shows a validation error and does not submit when the password is too short', async ({
+    page,
+  }) => {
+    let userRequested = false
+    await page.route('**/api/users', (route) => {
+      if (route.request().method() === 'POST') {
+        userRequested = true
+      }
+      return route.continue()
+    })
+
+    await login(page, ADMIN.email, ADMIN.password)
+    await page.goto('/user')
+
+    await page.getByRole('button', { name: 'Add user' }).click()
+    const dialog = page.getByRole('dialog')
+
+    await page.getByLabel('Name').fill('E2E Test User')
+    await page.getByLabel('Email').fill(`e2e-user-${Date.now()}@example.com`)
+    await page.getByLabel('Password').fill('short1')
+    await page.getByRole('button', { name: 'Create user' }).click()
+
+    await expect(page.getByText('Password must be at least 8 characters')).toBeVisible()
+    expect(userRequested).toBe(false)
+    await expect(dialog).toBeVisible()
+  })
+
+  test('shows a server-side conflict error when the email is already taken', async ({ page }) => {
+    await login(page, ADMIN.email, ADMIN.password)
+    await page.goto('/user')
+
+    await page.getByRole('button', { name: 'Add user' }).click()
+    const dialog = page.getByRole('dialog')
+
+    await page.getByLabel('Name').fill('Duplicate Email User')
+    await page.getByLabel('Email').fill(ADMIN.email)
+    await page.getByLabel('Password').fill('password123')
+
+    const usersCreated = page.waitForResponse(
+      (res) => res.url().includes('/api/users') && res.request().method() === 'POST',
+    )
+    await page.getByRole('button', { name: 'Create user' }).click()
+    await usersCreated
+
+    await expect(page.getByText('A user with this email already exists')).toBeVisible()
+    await expect(dialog).toBeVisible()
+  })
+})
+
 test.describe('health badge', () => {
   test('shows the API as reachable on a normal page load', async ({ page }) => {
     await login(page, ADMIN.email, ADMIN.password)
