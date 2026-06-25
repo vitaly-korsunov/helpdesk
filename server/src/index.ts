@@ -5,7 +5,8 @@ import { toNodeHandler } from "better-auth/node";
 import { hashPassword } from "better-auth/crypto";
 import { auth } from "./auth";
 import { prisma } from "./db";
-import { requireAuth, requireRole } from "./middleware";
+import { requireAuth, requireInboundSecret, requireRole } from "./middleware";
+import { inboundEmailSchema, ingestInboundEmail } from "./inboundEmail";
 import { Role } from "../generated/prisma/enums";
 
 const userSelect = {
@@ -39,7 +40,10 @@ app.get("/api/health", (_req, res) => {
 });
 
 app.get("/api/tickets", requireAuth, async (_req, res) => {
-  const tickets = await prisma.ticket.findMany({ orderBy: { id: "asc" } });
+  const tickets = await prisma.ticket.findMany({
+    orderBy: { id: "asc" },
+    include: { messages: { orderBy: { id: "asc" } } },
+  });
   res.json(tickets);
 });
 
@@ -48,6 +52,16 @@ app.post("/api/tickets", requireAuth, async (req, res) => {
     data: { subject: req.body.subject },
   });
   res.status(201).json(ticket);
+});
+
+app.post("/api/email/inbound", requireInboundSecret, async (req, res) => {
+  const parsed = inboundEmailSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ message: parsed.error.issues[0].message });
+  }
+
+  const result = await ingestInboundEmail(parsed.data);
+  res.status(result.threaded || result.deduplicated ? 200 : 201).json(result);
 });
 
 app.get("/api/users", requireRole(Role.ADMIN), async (_req, res) => {

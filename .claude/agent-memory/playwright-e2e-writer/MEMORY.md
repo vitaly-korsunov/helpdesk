@@ -1,1 +1,1 @@
-- [Helpdesk auth e2e coverage](project_helpdesk_auth_e2e.md) — login/logout/session/users CRUD (add+edit user dialogs, GET/POST/PATCH /api/users authz), getByLabel-vs-aria-label gotcha, what was skipped and why
+- [Helpdesk auth e2e coverage](project_helpdesk_auth_e2e.md) — login/logout/session/users CRUD/delete/inbound-email-to-ticket (58 tests total), getByLabel-vs-aria-label gotcha, zod required-string omit-vs-empty gotcha

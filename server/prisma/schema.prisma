@@ -9,9 +9,23 @@ datasource db {
 }
 
 model Ticket {
-  id      Int    @id @default(autoincrement())
-  subject String
-  status  String @default("open")
+  id             Int             @id @default(autoincrement())
+  subject        String
+  status         String          @default("open")
+  requesterEmail String?
+  messages       TicketMessage[]
+}
+
+model TicketMessage {
+  id        Int      @id @default(autoincrement())
+  ticketId  Int
+  ticket    Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  fromEmail String
+  body      String
+  messageId String?  @unique
+  createdAt DateTime @default(now())
+
+  @@index([ticketId])
 }
 
 enum Role {

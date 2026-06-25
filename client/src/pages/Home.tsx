@@ -14,15 +14,37 @@ import { Field, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 
+interface TicketMessage {
+  id: number
+  fromEmail: string
+  body: string
+  createdAt: string
+}
+
 interface Ticket {
   id: number
   subject: string
   status: 'open' | 'closed'
+  requesterEmail: string | null
+  messages: TicketMessage[]
 }
 
 function Home() {
   const queryClient = useQueryClient()
   const [subject, setSubject] = useState('')
+  const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set())
+
+  function toggleExpanded(id: number) {
+    setExpandedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) {
+        next.delete(id)
+      } else {
+        next.add(id)
+      }
+      return next
+    })
+  }
 
   const { data: health, isPending: healthPending } = useQuery({
     queryKey: ['health'],
@@ -110,19 +132,43 @@ function Home() {
           ) : (
             <ul className="divide-y divide-border">
               {tickets.map((ticket) => (
-                <li
-                  key={ticket.id}
-                  className="ticket-stub flex items-center justify-between gap-3 py-3 pr-1 text-sm text-foreground"
-                >
-                  <span>
-                    <span className="rounded-sm bg-muted px-1.5 py-0.5 font-mono text-xs tracking-tight text-muted-foreground">
-                      #{ticket.id}
-                    </span>{' '}
-                    {ticket.subject}
-                  </span>
-                  <Badge variant={ticket.status === 'open' ? 'default' : 'secondary'}>
-                    {ticket.status}
-                  </Badge>
+                <li key={ticket.id} className="py-3 pr-1 text-sm text-foreground">
+                  <div className="ticket-stub flex items-center justify-between gap-3">
+                    <span>
+                      <span className="rounded-sm bg-muted px-1.5 py-0.5 font-mono text-xs tracking-tight text-muted-foreground">
+                        #{ticket.id}
+                      </span>{' '}
+                      {ticket.subject}
+                    </span>
+                    <Badge variant={ticket.status === 'open' ? 'default' : 'secondary'}>
+                      {ticket.status}
+                    </Badge>
+                  </div>
+                  {(ticket.requesterEmail || ticket.messages.length > 0) && (
+                    <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
+                      {ticket.requesterEmail && <span>via email · {ticket.requesterEmail}</span>}
+                      {ticket.messages.length > 0 && (
+                        <button
+                          type="button"
+                          className="underline underline-offset-2 hover:text-foreground"
+                          onClick={() => toggleExpanded(ticket.id)}
+                        >
+                          {expandedIds.has(ticket.id) ? 'Hide' : 'Show'} {ticket.messages.length}{' '}
+                          {ticket.messages.length === 1 ? 'message' : 'messages'}
+                        </button>
+                      )}
+                    </div>
+                  )}
+                  {expandedIds.has(ticket.id) && (
+                    <ul className="mt-2 space-y-2 border-l-2 border-border pl-3">
+                      {ticket.messages.map((message) => (
+                        <li key={message.id} className="text-xs text-muted-foreground">
+                          <span className="font-medium text-foreground">{message.fromEmail}</span>:{' '}
+                          {message.body}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </li>
               ))}
             </ul>
