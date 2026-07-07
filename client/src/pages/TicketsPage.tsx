@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { Controller, useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -409,10 +410,15 @@ function TicketsPage() {
                       </Select>
                     </TableCell>
                     <TableCell className="font-medium">
-                      <span className="rounded-sm bg-muted px-1.5 py-0.5 font-mono text-xs tracking-tight text-muted-foreground">
-                        #{ticket.id}
-                      </span>{' '}
-                      {ticket.subject}
+                      <Link
+                        to={`/tickets/${ticket.id}`}
+                        className="hover:text-primary hover:underline"
+                      >
+                        <span className="rounded-sm bg-muted px-1.5 py-0.5 font-mono text-xs tracking-tight text-muted-foreground">
+                          #{ticket.id}
+                        </span>{' '}
+                        {ticket.subject}
+                      </Link>
                     </TableCell>
                     <TableCell>
                       <Badge variant="outline">{ticket.category}</Badge>

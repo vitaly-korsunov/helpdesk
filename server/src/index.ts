@@ -65,6 +65,23 @@ app.post("/api/tickets", requireAuth, async (req, res) => {
   res.status(201).json(ticket);
 });
 
+app.get("/api/tickets/:id", requireAuth, async (req, res) => {
+  const ticketId = Number(req.params.id);
+  if (!Number.isInteger(ticketId)) {
+    return res.status(400).json({ message: "Invalid ticket id" });
+  }
+
+  const ticket = await prisma.ticket.findUnique({
+    where: { id: ticketId },
+    include: { messages: { orderBy: { id: "asc" } } },
+  });
+  if (!ticket) {
+    return res.status(404).json({ message: "Ticket not found" });
+  }
+
+  res.json(ticket);
+});
+
 app.patch("/api/tickets/:id", requireAuth, async (req, res) => {
   const parsed = updateTicketStatusSchema.safeParse(req.body);
   if (!parsed.success) {

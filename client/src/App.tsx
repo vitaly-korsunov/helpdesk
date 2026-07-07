@@ -3,6 +3,7 @@ import NavBar from './components/NavBar'
 import Login from './components/Login'
 import Home from './pages/Home'
 import TicketsPage from './pages/TicketsPage'
+import TicketDetailPage from './pages/TicketDetailPage'
 import UsersPage from './pages/UsersPage'
 import { useSession } from './lib/auth-client'
 
@@ -28,6 +29,7 @@ function App() {
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/tickets" element={<TicketsPage />} />
+        <Route path="/tickets/:id" element={<TicketDetailPage />} />
         <Route
           path="/user"
           element={
