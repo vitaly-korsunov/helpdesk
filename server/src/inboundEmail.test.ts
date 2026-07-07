@@ -4,6 +4,7 @@ interface FakeTicket {
   id: number;
   subject: string;
   status: string;
+  requesterName: string | null;
   requesterEmail: string | null;
 }
 
@@ -50,9 +51,10 @@ const mockPrisma = {
   },
   ticket: {
     findMany: mock(
-      async ({ where }: { where: { requesterEmail: string; status: { not: string } } }) =>
+      async ({ where }: { where: { requesterEmail: string; status: { notIn: string[] } } }) =>
         tickets.filter(
-          (t) => t.requesterEmail === where.requesterEmail && t.status !== where.status.not,
+          (t) =>
+            t.requesterEmail === where.requesterEmail && !where.status.notIn.includes(t.status),
         ),
     ),
     update: mock(async ({ where, data }: { where: { id: number }; data: { status: string } }) => {
@@ -65,9 +67,14 @@ const mockPrisma = {
       async ({
         data,
       }: {
-        data: { subject: string; status: string; requesterEmail: string };
+        data: {
+          subject: string;
+          status: string;
+          requesterEmail: string;
+          requesterName?: string;
+        };
       }) => {
-        const ticket: FakeTicket = { id: nextTicketId++, ...data };
+        const ticket: FakeTicket = { id: nextTicketId++, requesterName: null, ...data };
         tickets.push(ticket);
         return ticket;
       },
@@ -125,8 +132,19 @@ describe("ingestInboundEmail", () => {
     expect(ticketMessages[0]).toMatchObject({ ticketId: 1, fromEmail: "customer@example.com" });
   });
 
+  test("stores the sender's name on the new ticket when provided", async () => {
+    const result = await ingestInboundEmail({
+      from: "customer@example.com",
+      fromName: "Jane Customer",
+      subject: "Printer is broken",
+      text: "It won't turn on.",
+    });
+
+    expect(tickets[0]).toMatchObject({ id: result.ticketId, requesterName: "Jane Customer" });
+  });
+
   test("threads onto an existing ticket via inReplyTo", async () => {
-    tickets.push({ id: 1, subject: "Printer is broken", status: "open", requesterEmail: "customer@example.com" });
+    tickets.push({ id: 1, subject: "Printer is broken", status: "open", requesterName: null, requesterEmail: "customer@example.com" });
     ticketMessages.push({ id: 1, ticketId: 1, fromEmail: "customer@example.com", body: "It won't turn on.", messageId: "<orig@mail>" });
 
     const result = await ingestInboundEmail({
@@ -142,7 +160,7 @@ describe("ingestInboundEmail", () => {
   });
 
   test("threads onto an existing ticket via the references array", async () => {
-    tickets.push({ id: 1, subject: "Printer is broken", status: "open", requesterEmail: "customer@example.com" });
+    tickets.push({ id: 1, subject: "Printer is broken", status: "open", requesterName: null, requesterEmail: "customer@example.com" });
     ticketMessages.push({ id: 1, ticketId: 1, fromEmail: "customer@example.com", body: "It won't turn on.", messageId: "<orig@mail>" });
 
     const result = await ingestInboundEmail({
@@ -156,7 +174,7 @@ describe("ingestInboundEmail", () => {
   });
 
   test("reopens a closed ticket when a reply references it", async () => {
-    tickets.push({ id: 1, subject: "Printer is broken", status: "closed", requesterEmail: "customer@example.com" });
+    tickets.push({ id: 1, subject: "Printer is broken", status: "closed", requesterName: null, requesterEmail: "customer@example.com" });
     ticketMessages.push({ id: 1, ticketId: 1, fromEmail: "customer@example.com", body: "It won't turn on.", messageId: "<orig@mail>" });
 
     await ingestInboundEmail({
@@ -170,7 +188,7 @@ describe("ingestInboundEmail", () => {
   });
 
   test("falls back to subject + sender matching when there are no reference headers", async () => {
-    tickets.push({ id: 1, subject: "Printer is broken", status: "open", requesterEmail: "customer@example.com" });
+    tickets.push({ id: 1, subject: "Printer is broken", status: "open", requesterName: null, requesterEmail: "customer@example.com" });
 
     const result = await ingestInboundEmail({
       from: "customer@example.com",
@@ -182,7 +200,20 @@ describe("ingestInboundEmail", () => {
   });
 
   test("subject fallback ignores closed tickets and creates a new one instead", async () => {
-    tickets.push({ id: 1, subject: "Printer is broken", status: "closed", requesterEmail: "customer@example.com" });
+    tickets.push({ id: 1, subject: "Printer is broken", status: "closed", requesterName: null, requesterEmail: "customer@example.com" });
+
+    const result = await ingestInboundEmail({
+      from: "customer@example.com",
+      subject: "Re: Printer is broken",
+      text: "It's broken again.",
+    });
+
+    expect(result.threaded).toBe(false);
+    expect(tickets).toHaveLength(2);
+  });
+
+  test("subject fallback ignores resolved tickets and creates a new one instead", async () => {
+    tickets.push({ id: 1, subject: "Printer is broken", status: "resolved", requesterName: null, requesterEmail: "customer@example.com" });
 
     const result = await ingestInboundEmail({
       from: "customer@example.com",
@@ -195,7 +226,7 @@ describe("ingestInboundEmail", () => {
   });
 
   test("subject fallback does not match a different sender", async () => {
-    tickets.push({ id: 1, subject: "Printer is broken", status: "open", requesterEmail: "someone-else@example.com" });
+    tickets.push({ id: 1, subject: "Printer is broken", status: "open", requesterName: null, requesterEmail: "someone-else@example.com" });
 
     const result = await ingestInboundEmail({
       from: "customer@example.com",
@@ -208,7 +239,7 @@ describe("ingestInboundEmail", () => {
   });
 
   test("deduplicates a replayed messageId without creating anything new", async () => {
-    tickets.push({ id: 1, subject: "Printer is broken", status: "open", requesterEmail: "customer@example.com" });
+    tickets.push({ id: 1, subject: "Printer is broken", status: "open", requesterName: null, requesterEmail: "customer@example.com" });
     ticketMessages.push({ id: 1, ticketId: 1, fromEmail: "customer@example.com", body: "It won't turn on.", messageId: "<dup@mail>" });
 
     const result = await ingestInboundEmail({

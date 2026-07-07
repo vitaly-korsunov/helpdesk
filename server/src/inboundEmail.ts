@@ -3,6 +3,7 @@ import { prisma } from "./db";
 
 export const inboundEmailSchema = z.object({
   from: z.string().min(1, "From is required").email("Enter a valid sender email"),
+  fromName: z.string().trim().optional(),
   subject: z.string().trim().min(1, "Subject is required"),
   text: z.string().trim().min(1, "Body is required"),
   messageId: z.string().optional(),
@@ -29,7 +30,7 @@ export interface IngestResult {
 }
 
 export async function ingestInboundEmail(input: InboundEmailInput): Promise<IngestResult> {
-  const { from, subject, text, messageId, inReplyTo, references } = input;
+  const { from, fromName, subject, text, messageId, inReplyTo, references } = input;
 
   if (messageId) {
     const existing = await prisma.ticketMessage.findUnique({ where: { messageId } });
@@ -56,7 +57,7 @@ export async function ingestInboundEmail(input: InboundEmailInput): Promise<Inge
 
   if (ticketId === null) {
     const candidates = await prisma.ticket.findMany({
-      where: { requesterEmail: from, status: { not: "closed" } },
+      where: { requesterEmail: from, status: { notIn: ["closed", "resolved"] } },
       orderBy: { id: "desc" },
     });
     const normalized = normalizeSubject(subject);
@@ -76,7 +77,7 @@ export async function ingestInboundEmail(input: InboundEmailInput): Promise<Inge
 
   const created = await prisma.$transaction(async (tx) => {
     const ticket = await tx.ticket.create({
-      data: { subject, status: "open", requesterEmail: from },
+      data: { subject, status: "open", requesterEmail: from, requesterName: fromName },
     });
     await tx.ticketMessage.create({
       data: { ticketId: ticket.id, fromEmail: from, body: text, messageId },

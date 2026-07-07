@@ -12,8 +12,18 @@ model Ticket {
   id             Int             @id @default(autoincrement())
   subject        String
   status         String          @default("open")
+  category       TicketCategory  @default(OTHER)
+  requesterName  String?
   requesterEmail String?
+  createdAt      DateTime        @default(now())
   messages       TicketMessage[]
+}
+
+enum TicketCategory {
+  BUG
+  FEATURE
+  QUESTION
+  OTHER
 }
 
 model TicketMessage {

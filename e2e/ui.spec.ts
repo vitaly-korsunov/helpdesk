@@ -615,4 +615,36 @@ test.describe('ticket form', () => {
     await expect(page.getByRole('listitem').filter({ hasText: subject })).toBeVisible()
     await expect(countLocator).toHaveText(`${beforeCount + 1} total`)
   })
+
+  test('newer tickets appear before older tickets in the list', async ({ page }) => {
+    const ticketsLoaded = page.waitForResponse(
+      (res) => res.url().includes('/api/tickets') && res.request().method() === 'GET',
+    )
+    await login(page, ADMIN.email, ADMIN.password)
+    await ticketsLoaded
+
+    const subjectA = `e2e order check A ${Date.now()}`
+    const subjectB = `e2e order check B ${Date.now()}`
+
+    await page.getByLabel('Subject').fill(subjectA)
+    await page.getByRole('button', { name: 'Add ticket' }).click()
+    const ticketA = page.getByRole('listitem').filter({ hasText: subjectA })
+    await expect(ticketA).toBeVisible()
+
+    await page.getByLabel('Subject').fill(subjectB)
+    await page.getByRole('button', { name: 'Add ticket' }).click()
+    const ticketB = page.getByRole('listitem').filter({ hasText: subjectB })
+    await expect(ticketB).toBeVisible()
+
+    // B was created after A, so it has a higher id. The backend now orders
+    // tickets by id descending, so B's row should precede A's row regardless
+    // of how many other tickets exist in the (never-truncated) test DB.
+    const indexA = await ticketA.evaluate((el) =>
+      Array.from(el.parentElement?.children ?? []).indexOf(el),
+    )
+    const indexB = await ticketB.evaluate((el) =>
+      Array.from(el.parentElement?.children ?? []).indexOf(el),
+    )
+    expect(indexB).toBeLessThan(indexA)
+  })
 })

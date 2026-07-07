@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test'
 import { ADMIN } from './credentials'
 import { login } from './helpers'
+import { prisma } from './db'
 
 // Must match server/.env.test's INBOUND_EMAIL_SECRET. Hardcoded rather than
 // read from the .env file at test time -- this is a fixed test-fixture value
@@ -195,6 +196,115 @@ function normalizeForCompare(subject: string): string {
   return subject.trim().toLowerCase().replace(/^re:\s*/, '')
 }
 
+// Subject-fallback threading: covers the second matching branch in
+// ingestInboundEmail (server/src/inboundEmail.ts) that the create -> reply ->
+// replay flow above never exercises, since that flow's reply always carries
+// inReplyTo. Here the reply has no messageId/inReplyTo/references at all, so
+// the only way it can land on the existing ticket is the fallback query
+// (same requesterEmail + normalizeSubject() match, case-insensitive with the
+// Re:/Fwd:/FW: prefix stripped). Proven end-to-end against the real test DB,
+// not mocked -- the unit-test equivalent (inboundEmail.test.ts) mocks prisma.
+test.describe('POST /api/email/inbound subject-fallback threading', () => {
+  test('a reply with no reference headers threads onto an existing ticket by sender + normalized subject', async ({
+    request,
+  }) => {
+    const uniqueId = Date.now()
+    const from = `inbound-fallback-${uniqueId}@example.com`
+    const subject = `Foo Bar ${uniqueId}`
+
+    // Phase 1: fresh inbound email -> new ticket (201). No messageId at all,
+    // to keep this scenario fully independent of the messageId-based
+    // dedup/threading paths already covered above.
+    const firstResponse = await request.post('/api/email/inbound', {
+      headers: { 'X-Inbound-Secret': INBOUND_SECRET },
+      data: { from, subject, text: 'First message body' },
+    })
+
+    expect(firstResponse.status()).toBe(201)
+    const firstBody = await firstResponse.json()
+    expect(firstBody).toMatchObject({ threaded: false, deduplicated: false })
+    const ticketId = firstBody.ticketId as number
+
+    // Phase 2: same sender, case-different subject with a reply prefix, and
+    // deliberately no messageId/inReplyTo/references -- the only signal
+    // available to the server is sender email + normalized subject.
+    const replyResponse = await request.post('/api/email/inbound', {
+      headers: { 'X-Inbound-Secret': INBOUND_SECRET },
+      data: { from, subject: `Re: ${subject.toLowerCase()}`, text: 'Reply body, no headers' },
+    })
+
+    expect(replyResponse.status()).toBe(200)
+    const replyBody = await replyResponse.json()
+    expect(replyBody).toEqual({ ticketId, threaded: true, deduplicated: false })
+
+    await signInAdmin(request)
+    const tickets = await request.get('/api/tickets')
+    expect(tickets.ok()).toBe(true)
+    const list = await tickets.json()
+
+    // Exactly one ticket for this sender+subject pair -- proves the reply
+    // joined the original ticket rather than creating a second one.
+    const matchingTickets = list.filter(
+      (t: { requesterEmail: string | null }) => t.requesterEmail === from,
+    )
+    expect(matchingTickets).toHaveLength(1)
+    expect(matchingTickets[0].id).toBe(ticketId)
+    expect(matchingTickets[0].messages).toHaveLength(2)
+    expect(matchingTickets[0].messages[1].fromEmail).toBe(from)
+  })
+})
+
+// Reopening a closed ticket via a threaded reply (ingestInboundEmail's
+// `prisma.ticket.update({ data: { status: "open" } })` on the threaded path,
+// server/src/inboundEmail.ts lines 69-74). There's no UI/API path that ever
+// sets a ticket's status to "closed" (only ingestInboundEmail itself writes
+// status, and only ever to "open"), so this test reaches into the real
+// helpdesk_test database directly via `prisma` (e2e/db.ts) to force the
+// ticket closed before exercising the reply path -- proving the real DB
+// write/read round-trip, not just the mocked-prisma unit test in
+// server/src/inboundEmail.test.ts.
+test.describe('POST /api/email/inbound reopens a closed ticket', () => {
+  test('a threaded reply to a closed ticket reopens it', async ({ request }) => {
+    const uniqueId = Date.now()
+    const from = `inbound-reopen-${uniqueId}@example.com`
+    const subject = `E2E Inbound Reopen Subject ${uniqueId}`
+    const firstMessageId = `msg-reopen-${uniqueId}-1@example.com`
+
+    const firstResponse = await request.post('/api/email/inbound', {
+      headers: { 'X-Inbound-Secret': INBOUND_SECRET },
+      data: { from, subject, text: 'First message body', messageId: firstMessageId },
+    })
+    expect(firstResponse.status()).toBe(201)
+    const firstBody = await firstResponse.json()
+    const ticketId = firstBody.ticketId as number
+
+    await prisma.ticket.update({ where: { id: ticketId }, data: { status: 'closed' } })
+
+    const replyResponse = await request.post('/api/email/inbound', {
+      headers: { 'X-Inbound-Secret': INBOUND_SECRET },
+      data: {
+        from,
+        subject: `Re: ${subject}`,
+        text: 'Reply body that should reopen the ticket',
+        messageId: `msg-reopen-${uniqueId}-2@example.com`,
+        inReplyTo: firstMessageId,
+      },
+    })
+    expect(replyResponse.status()).toBe(200)
+    const replyBody = await replyResponse.json()
+    expect(replyBody).toEqual({ ticketId, threaded: true, deduplicated: false })
+
+    await signInAdmin(request)
+    const afterReply = await request.get('/api/tickets')
+    expect(afterReply.ok()).toBe(true)
+    const afterReplyList = await afterReply.json()
+    const ticketAfterReply = afterReplyList.find((t: { id: number }) => t.id === ticketId)
+    expect(ticketAfterReply).toBeDefined()
+    expect(ticketAfterReply.status).toBe('open')
+    await request.post('/api/auth/sign-out')
+  })
+})
+
 // UI check: a separate, independent ticket (fresh unique data, not reusing the
 // threading test's fixtures) created via direct API POST, then verified
 // through the actual Home page rendering -- the "via email" sender line and
@@ -230,4 +340,11 @@ test.describe('inbound email rendering in the ticket list', () => {
     ).toBeVisible()
     await expect(ticketRow.getByText(`${from}: ${body}`)).toBeVisible()
   })
+})
+
+// This file is the only spec using a direct Prisma connection (e2e/db.ts) --
+// close it explicitly so the Playwright process doesn't hang on an open DB
+// connection after the run completes.
+test.afterAll(async () => {
+  await prisma.$disconnect()
 })

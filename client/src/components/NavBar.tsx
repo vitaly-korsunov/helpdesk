@@ -19,6 +19,12 @@ function NavBar({ userName, isAdmin }: NavBarProps) {
       </Link>
       {userName && (
         <div className="flex items-center gap-4">
+          <Link
+            to="/tickets"
+            className="text-sm font-medium text-secondary-foreground hover:text-foreground"
+          >
+            Tickets
+          </Link>
           {isAdmin && (
             <Link
               to="/user"

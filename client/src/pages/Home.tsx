@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { type ticketStatuses } from 'core'
 import { api } from '@/lib/api'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -24,7 +25,8 @@ interface TicketMessage {
 interface Ticket {
   id: number
   subject: string
-  status: 'open' | 'closed'
+  status: (typeof ticketStatuses)[number]
+  requesterName: string | null
   requesterEmail: string | null
   messages: TicketMessage[]
 }
@@ -140,13 +142,18 @@ function Home() {
                       </span>{' '}
                       {ticket.subject}
                     </span>
-                    <Badge variant={ticket.status === 'open' ? 'default' : 'secondary'}>
+                    <Badge variant={ticket.status === 'open' ? 'default' : ticket.status === 'resolved' ? 'secondary' : 'outline'}>
                       {ticket.status}
                     </Badge>
                   </div>
                   {(ticket.requesterEmail || ticket.messages.length > 0) && (
                     <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
-                      {ticket.requesterEmail && <span>via email · {ticket.requesterEmail}</span>}
+                      {ticket.requesterEmail && (
+                        <span>
+                          via email · {ticket.requesterName ? `${ticket.requesterName} ` : ''}
+                          {ticket.requesterName ? `<${ticket.requesterEmail}>` : ticket.requesterEmail}
+                        </span>
+                      )}
                       {ticket.messages.length > 0 && (
                         <button
                           type="button"

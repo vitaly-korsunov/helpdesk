@@ -6,6 +6,7 @@
       "name": "helpdesk",
       "devDependencies": {
         "@playwright/test": "^1.58.2",
+        "@prisma/adapter-pg": "latest",
       },
     },
     "client": {

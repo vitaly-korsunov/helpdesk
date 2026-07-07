@@ -1,6 +1,6 @@
 import cors from "cors";
 import express from "express";
-import { createUserSchema, updateUserSchema } from "core";
+import { createTicketSchema, createUserSchema, updateTicketStatusSchema, updateUserSchema } from "core";
 import { toNodeHandler } from "better-auth/node";
 import { hashPassword } from "better-auth/crypto";
 import { auth } from "./auth";
@@ -41,17 +41,51 @@ app.get("/api/health", (_req, res) => {
 
 app.get("/api/tickets", requireAuth, async (_req, res) => {
   const tickets = await prisma.ticket.findMany({
-    orderBy: { id: "asc" },
+    orderBy: { id: "desc" },
     include: { messages: { orderBy: { id: "asc" } } },
   });
   res.json(tickets);
 });
 
 app.post("/api/tickets", requireAuth, async (req, res) => {
+  const parsed = createTicketSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ message: parsed.error.issues[0].message });
+  }
+  const { subject, category, requesterName, requesterEmail } = parsed.data;
+
   const ticket = await prisma.ticket.create({
-    data: { subject: req.body.subject },
+    data: {
+      subject,
+      ...(category ? { category } : {}),
+      requesterName: requesterName || null,
+      requesterEmail: requesterEmail || null,
+    },
   });
   res.status(201).json(ticket);
+});
+
+app.patch("/api/tickets/:id", requireAuth, async (req, res) => {
+  const parsed = updateTicketStatusSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ message: parsed.error.issues[0].message });
+  }
+  const ticketId = Number(req.params.id);
+  if (!Number.isInteger(ticketId)) {
+    return res.status(400).json({ message: "Invalid ticket id" });
+  }
+
+  const existing = await prisma.ticket.findUnique({ where: { id: ticketId } });
+  if (!existing) {
+    return res.status(404).json({ message: "Ticket not found" });
+  }
+
+  const ticket = await prisma.ticket.update({
+    where: { id: ticketId },
+    data: { status: parsed.data.status },
+  });
+
+  res.json(ticket);
 });
 
 app.post("/api/email/inbound", requireInboundSecret, async (req, res) => {
